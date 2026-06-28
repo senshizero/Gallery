@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ultimate Offline Gallery Pro</title>
+    
+    <!-- PWA Requirements (Dynamically Populated via JS) -->
+    <link rel="manifest" id="pwa-manifest">
+    <meta name="theme-color" content="#1db954">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI1MCIgZmlsbD0iIzFkYjk1NCIvPjwvc3ZnPg==">
+
+    <style>
+        /* Disable Pull-to-Refresh globally */
+        html, body { overscroll-behavior-y: none; margin: 0; padding: 0; background-color: #121212; color: #ffffff; font-family: sans-serif; overflow-x: hidden; width: 100%; height: 100%; }
+        
+        /* Mistouch Optimization - Global touch action rules */
+        button, .btn, .thumb, select, input { touch-action: manipulation; }
+
+        /* Homepage Layout */
+        .layout-container { display: flex; min-height: 100vh; flex-direction: row; }
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; height: 100vh; scroll-behavior: smooth; }
+        
+        .controls-container { background: #1e1e1e; padding: 15px; display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap; border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 5; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        
+        /* Mistouch Optimization - Min-height 44px for touch targets */
+        .btn { padding: 10px 15px; min-height: 44px; cursor: pointer; background: #1db954; color: white; border: none; border-radius: 6px; font-weight: bold; transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 5px; min-width: 120px; font-family: inherit; font-size: 14px; }
+        .btn:hover { background: #179b44; }
+        .btn:active { transform: scale(0.98); }
+        .nav-btn-home { background: #555; }
+        .nav-btn-home:hover { background: #666; }
+        
+        #installAppBtn { background: #ff9800; display: none; }
+        #installAppBtn:hover { background: #f57c00; }
+        
+        .search-input { padding: 10px 15px; min-height: 44px; border-radius: 6px; border: 1px solid #333; background: #222; color: #fff; min-width: 250px; font-family: inherit; font-size: 14px; box-sizing: border-box; }
+        .search-input:focus { outline: none; border-color: #1db954; }
+        .styled-select { padding: 10px; min-height: 44px; border-radius: 6px; border: 1px solid #333; background: #222; color: #fff; cursor: pointer; font-family: inherit; font-weight: bold; font-size: 14px; }
+        .styled-select:focus { outline: none; border-color: #1db954; }
+
+        /* Dropdown Styles */
+        .dropdown { position: relative; display: inline-block; }
+        .dropdown-content { display: none; position: absolute; background-color: #222; min-width: 220px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.6); z-index: 10; border: 1px solid #444; border-radius: 6px; max-height: 350px; overflow-y: auto; top: 115%; left: 0; }
+        
+        /* Mistouch Optimization - Larger dropdown items */
+        .dropdown-content label, .dropdown-content .action-btn { display: block; padding: 14px 16px; cursor: pointer; border-bottom: 1px solid #333; font-size: 15px; color: white; text-align: left; background: none; border-left: none; border-right: none; border-top: none; width: 100%; box-sizing: border-box; min-height: 48px; }
+        .dropdown-content label:hover, .dropdown-content .action-btn:hover { background-color: #2f2f2f; }
+        .dropdown-content label:last-child, .dropdown-content .action-btn:last-child { border-bottom: none; }
+        .dropdown-content input[type="checkbox"] { margin-right: 12px; accent-color: #1db954; transform: scale(1.2); }
+
+        #gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; padding: 20px; }
+        .thumb { cursor: pointer; background: #222; border-radius: 8px; padding: 6px; text-align: center; transition: transform 0.2s; border: 1px solid #333; position: relative; }
+        .thumb:hover { transform: translateY(-3px); border-color: #1db954; }
+        .thumb img { width: 100%; height: 160px; object-fit: cover; border-radius: 6px; background-color: #111; }
+        .thumb-type { position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; }
+        .thumb-number { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.8); padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; color: #eee; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        
+        .pagination { display: flex; justify-content: center; gap: 12px; padding: 25px; flex-wrap: wrap; margin-top: auto; }
+        .page-btn { background: #333; min-height: 44px; min-width: 44px; color: #fff; padding: 10px 15px; border-radius: 6px; cursor: pointer; border: 1px solid #444; font-size: 16px; font-weight: bold; }
+        .page-btn.active { background: #1db954; border-color: #1db954; pointer-events: none; }
+        .page-btn:hover:not(.active) { background: #444; }
+
+        /* Homepage Side Panel */
+        .home-side-panel { width: 350px; min-width: 350px; background: #161616; border-left: 1px solid #333; display: flex; flex-direction: column; height: 100vh; position: sticky; top: 0; box-sizing: border-box; }
+        .home-side-panel h3 { margin: 0; padding: 20px; background: #1e1e1e; border-bottom: 1px solid #333; text-align: center; font-size: 18px; color: #1db954; }
+        .marks-list { list-style: none; padding: 15px; margin: 0; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex-grow: 1; }
+        .file-group-title { color: #aaa; font-size: 13px; margin: 15px 0 8px 0; word-break: break-all; border-bottom: 1px solid #333; padding-bottom: 6px; font-weight: bold; }
+        .mark-item { background: #252525; padding: 14px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border: 1px solid transparent; transition: all 0.2s; min-height: 48px; }
+        .mark-item:hover { background: #2f2f2f; border-color: #444; }
+        .mark-info { display: flex; flex-direction: column; gap: 4px; }
+        .mark-type { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #1db954; font-weight: bold; }
+        .mark-label { font-size: 14px; color: #eee; }
+        
+        /* Mistouch Optimization - Larger delete button */
+        .mark-delete { color: #ff4d4d; background: rgba(255, 77, 77, 0.1); border: 1px solid transparent; font-size: 16px; cursor: pointer; padding: 10px; border-radius: 6px; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
+        .mark-delete:hover { background: rgba(255, 77, 77, 0.2); border-color: #ff4d4d; }
+        .empty-marks { text-align: center; padding: 40px 20px; color: #777; font-size: 15px; line-height: 1.5; }
+
+        /* Fullscreen Viewer Modal */
+        #viewerModal { 
+            display: none; position: fixed; inset: 0; background: #050505; z-index: 9999; flex-direction: column; height: 100vh; overflow: hidden; 
+            -webkit-user-select: none; user-select: none; touch-action: none; /* Prevent scroll on modal */
+        }
+        
+        .top-nav-bar { position: absolute; top: 20px; left: 20px; display: flex; gap: 12px; z-index: 100; }
+        .viewer-nav-btn { background: rgba(0,0,0,0.6); border: 1px solid #444; color: white; padding: 10px 18px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-weight: bold; backdrop-filter: blur(5px); transition: background 0.2s, transform 0.1s; font-family: inherit; font-size: 15px; min-height: 44px; }
+        .viewer-nav-btn:hover { background: rgba(29, 185, 84, 0.9); border-color: #1db954; }
+        .viewer-nav-btn:active { transform: scale(0.95); }
+
+        .media-counter { position: absolute; top: 20px; right: 25px; font-size: 28px; color: rgba(255,255,255,0.25); font-weight: bold; pointer-events: none; z-index: 50; text-shadow: 2px 2px 8px rgba(0,0,0,0.8); font-family: monospace; }
+
+        .timeline-container { height: 18px; background: #222; position: relative; cursor: pointer; flex-shrink: 0; display: none; touch-action: none; }
+        .timeline-progress { height: 100%; background: #1db954; width: 0%; pointer-events: none; }
+        .timeline-mark { position: absolute; top: 0; height: 100%; width: 4px; background: #007bff; z-index: 2; pointer-events: none; }
+        .timeline-loop { position: absolute; top: 0; height: 100%; background: rgba(156, 39, 176, 0.6); z-index: 1; pointer-events: none; }
+        
+        .media-area { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; position: relative; width: 100%; min-height: 0; background: #000; overflow: hidden; }
+        #viewEl { width: 100%; height: 100%; object-fit: contain; }
+        
+        #interactionLayer { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; cursor: crosshair;
+            touch-action: none; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+        }
+        
+        /* Mistouch Optimization - Larger arrows, padding */
+        .nav-arrow { 
+            position: absolute; top: 50%; transform: translateY(-50%); font-size: 45px; color: rgba(255,255,255,0.4); cursor: pointer; z-index: 20; padding: 25px 15px; transition: color 0.2s, background 0.2s; background: rgba(0,0,0,0.2); border-radius: 12px;
+            -webkit-user-select: none; user-select: none; touch-action: manipulation;
+        }
+        .nav-arrow:hover { color: #fff; background: rgba(0,0,0,0.7); }
+        .nav-arrow.left { left: 15px; }
+        .nav-arrow.right { right: 15px; }
+
+        /* Key Moments Panel */
+        #keyMomentsPanel { display: none; position: relative; background: #151515; border-top: 1px solid #333; padding: 15px 55px 15px 15px; flex-shrink: 0; width: 100%; box-sizing: border-box; touch-action: pan-x; }
+        #kmThumbContainer { display: flex; gap: 15px; overflow-x: auto; overflow-y: hidden; width: 100%; padding-bottom: 10px; }
+        #kmThumbContainer::-webkit-scrollbar { height: 10px; }
+        #kmThumbContainer::-webkit-scrollbar-track { background: #111; border-radius: 5px; }
+        #kmThumbContainer::-webkit-scrollbar-thumb { background: #444; border-radius: 5px; }
+        #kmThumbContainer::-webkit-scrollbar-thumb:hover { background: #666; }
+
+        .km-close-btn { position: absolute; top: 15px; right: 15px; background: #cc0000; color: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; font-size: 16px; font-weight: bold; display: flex; align-items: center; justify-content: center; z-index: 10; }
+        .km-close-btn:hover { background: #ff4d4d; }
+        .km-thumb { height: 100px; background: #222; border-radius: 6px; cursor: pointer; border: 2px solid transparent; transition: 0.2s; position: relative; overflow: hidden; flex-shrink: 0; }
+        .km-thumb:hover { border-color: #1db954; transform: scale(1.05); }
+        .km-thumb canvas { width: 100%; height: 100%; object-fit: cover; }
+        .km-time-label { position: absolute; bottom: 5px; right: 5px; background: rgba(0,0,0,0.8); font-size: 12px; padding: 3px 6px; border-radius: 4px; font-weight: bold; pointer-events: none;}
+
+        /* Metadata & Controls Footer */
+        .viewer-footer { display: flex; flex-direction: column; flex-shrink: 0; background: #111; border-top: 1px solid #222; padding-bottom: env(safe-area-inset-bottom); }
+        .metadata-panel { display: flex; gap: 20px; padding: 15px 20px; border-bottom: 1px solid #222; align-items: stretch; flex-wrap: wrap; }
+        
+        .metadata-col { display: flex; flex-direction: column; flex: 1; min-width: 280px; gap: 10px; }
+        .metadata-col span.title { font-size: 14px; font-weight: bold; color: #aaa; }
+        .metadata-col input, .metadata-col textarea { width: 100%; box-sizing: border-box; background: #222; border: 1px solid #333; color: white; padding: 12px 14px; border-radius: 6px; font-size: 15px; font-family: inherit; min-height: 44px; }
+        .metadata-col input:focus, .metadata-col textarea:focus { outline: none; border-color: #1db954; }
+        .metadata-col textarea { resize: none; min-height: 50px; flex-grow: 1; }
+        
+        .tag-suggestions { display: flex; flex-wrap: wrap; gap: 8px; min-height: 30px; align-items: center; margin-bottom: 4px; }
+        
+        /* Mistouch Optimization - Tag chips easy to tap */
+        .tag-chip { background: #2a2a2a; color: #ccc; font-size: 12px; padding: 8px 12px; border-radius: 16px; cursor: pointer; border: 1px solid #444; transition: all 0.2s; white-space: nowrap; font-weight: bold; min-height: 16px; display:flex; align-items:center; }
+        .tag-chip:hover { background: #1db954; color: white; border-color: #1db954; transform: scale(1.05); }
+
+        .viewer-bottom-bar { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 15px 20px; box-sizing: border-box; flex-wrap: wrap; }
+        
+        .slider-container { display: flex; align-items: center; gap: 12px; background: #222; padding: 10px 15px; border-radius: 6px; border: 1px solid #333; min-height: 44px; box-sizing: border-box;}
+        .slider-container label { font-size: 14px; font-weight: bold; color: #ddd; width: 80px; }
+        input[type="range"] { cursor: pointer; accent-color: #1db954; width: 120px; height: 20px; }
+
+        /* Toast Message */
+        #toastMsg { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(29, 185, 84, 0.95); color: #fff; padding: 14px 28px; border-radius: 8px; z-index: 10000; font-weight: bold; transition: opacity 0.3s, transform 0.3s; opacity: 0; pointer-events: none; box-shadow: 0 6px 16px rgba(0,0,0,0.6); font-size: 15px; }
+        #toastMsg.show { opacity: 1; transform: translateX(-50%) translateY(-10px); }
+
+        @media (max-width: 900px) {
+            .layout-container { flex-direction: column; }
+            .home-side-panel { width: 100%; height: auto; min-height: 300px; border-left: none; border-top: 1px solid #333; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="toastMsg">Notification</div>
+
+    <div class="layout-container">
+        <!-- Left Side: Main Gallery -->
+        <div class="main-content" id="mainContent">
+            <div class="controls-container">
+                <button class="btn nav-btn-home" onclick="goHome()">🏠 Home</button>
+                <button class="btn nav-btn-home" onclick="history.back()">⬅ Back</button>
+                
+                <!-- PWA Install Button (Hidden by default) -->
+                <button class="btn" id="installAppBtn" onclick="installPWA()">📲 Install App</button>
+
+                <label class="btn">📂 Select Folder <input type="file" id="folderPicker" webkitdirectory multiple style="display:none"/></label>
+                
+                <input type="text" id="searchInput" class="search-input" placeholder="Search by name, tags, or desc..." oninput="applyFilters()">
+                
+                <div class="dropdown">
+                    <button class="btn dropbtn" onclick="toggleDropdown(event, 'categoriesDropdown')">🏷️ Categories ▼</button>
+                    <div id="categoriesDropdown" class="dropdown-content">
+                        <div style="padding: 15px; color: #aaa;">No tags found</div>
+                    </div>
+                </div>
+
+                <select id="sortSelect" class="styled-select" onchange="applyFilters()">
+                    <option value="name">Sort: Name (A-Z)</option>
+                    <option value="date">Sort: Date (Newest)</option>
+                    <option value="size">Sort: Size (Largest)</option>
+                    <option value="duration">Sort: Duration (Longest)</option>
+                    <option value="resolution">Sort: Resolution (Highest)</option>
+                </select>
+
+                <div class="dropdown">
+                    <button class="btn dropbtn" onclick="toggleDropdown(event, 'settingsDropdown')" style="background:#555;">⚙️ Settings ▼</button>
+                    <div id="settingsDropdown" class="dropdown-content">
+                        <button class="action-btn" onclick="exportData()">💾 Export Data Backup</button>
+                        <button class="action-btn" onclick="document.getElementById('importFile').click()">📂 Import Data Backup</button>
+                        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+                    </div>
+                </div>
+
+                <button class="btn" onclick="filterType('all')">All Media</button>
+                <button class="btn" onclick="filterType('image')">Images</button>
+                <button class="btn" onclick="filterType('video')">Videos</button>
+            </div>
+
+            <div id="gallery"></div>
+            <div class="pagination" id="pagination"></div>
+        </div>
+
+        <!-- Right Side: Global Bookmarks Panel -->
+        <div class="home-side-panel">
+            <h3>Saved Marks & Loops</h3>
+            <ul id="marksList" class="marks-list">
+                <div class="empty-marks">No marks or loops saved yet. Select a folder to load your saved marks.</div>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Viewer Modal -->
+    <div id="viewerModal">
+        <!-- Top Navigation -->
+        <div class="top-nav-bar">
+            <button class="viewer-nav-btn" onclick="closeViewer()">⬅ Back to Gallery</button>
+            <button class="viewer-nav-btn" onclick="goHome()">🏠 Home</button>
+        </div>
+
+        <!-- Visual Timeline -->
+        <div class="timeline-container" id="timelineContainer" onclick="seekTimeline(event)">
+            <div class="timeline-progress" id="timelineProgress"></div>
+            <div id="timelineMarks"></div>
+        </div>
+
+        <!-- Media Area -->
+        <div class="media-area" id="mediaArea">
+            <!-- Media Counter -->
+            <div id="mediaCounter" class="media-counter"></div>
+
+            <div id="mediaContainer" style="width:100%; height:100%; display:flex; justify-content:center; align-items:center;"></div>
+            
+            <div class="nav-arrow left" onclick="navigateMedia(-1); event.stopPropagation();">❮</div>
+            <div class="nav-arrow right" onclick="navigateMedia(1); event.stopPropagation();">❯</div>
+        </div>
+
+        <!-- Key Moments Below Video Section -->
+        <div id="keyMomentsPanel">
+            <button class="km-close-btn" onclick="closeKeyMoments()" title="Close Panel">✖</button>
+            <div id="kmThumbContainer"></div>
+        </div>
+
+        <!-- Footer (Metadata & Controls) -->
+        <div class="viewer-footer">
+            <div class="metadata-panel">
+                <div class="metadata-col">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <span class="title">Tags:</span>
+                    </div>
+                    <!-- Tag Suggestion Bar -->
+                    <div id="tagSuggestions" class="tag-suggestions"></div>
+                    <input type="text" id="metaTags" placeholder="Add tags (comma separated)..." oninput="saveMetadata()">
+                </div>
+                <div class="metadata-col" style="flex: 2;">
+                    <span class="title">Description:</span>
+                    <textarea id="metaDesc" placeholder="Add description..." oninput="saveMetadata()"></textarea>
+                </div>
+            </div>
+            
+            <div class="viewer-bottom-bar" id="viewerControls">
+                <!-- Dynamically populated controls -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- PWA Setup via Blob (Single File App) ---
+        const setupPWA = () => {
+            // 1. Inject Manifest
+            const manifest = {
+                "name": "Ultimate Offline Gallery Pro",
+                "short_name": "Gallery Pro",
+                "start_url": ".",
+                "display": "standalone",
+                "background_color": "#121212",
+                "theme_color": "#1db954",
+                "icons": [{
+                    "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI1MCIgZmlsbD0iIzFkYjk1NCIvPjwvc3ZnPg==",
+                    "sizes": "192x192",
+                    "type": "image/svg+xml",
+                    "purpose": "any maskable"
+                }]
+            };
+            const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/manifest+json'});
+            document.getElementById('pwa-manifest').href = URL.createObjectURL(manifestBlob);
+
+            // 2. Inject Service Worker (For caching app shell and installability)
+            const swCode = `
+                const CACHE_NAME = 'gallery-pro-v1';
+                self.addEventListener('install', (e) => {
+                    self.skipWaiting();
+                });
+                self.addEventListener('activate', (e) => {
+                    e.waitUntil(clients.claim());
+                });
+                self.addEventListener('fetch', (e) => {
+                    // Minimal fetch handler to satisfy PWA requirements
+                    e.respondWith(fetch(e.request).catch(() => new Response("Offline Mode active.")));
+                });
+            `;
+            const swBlob = new Blob([swCode], {type: 'application/javascript'});
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register(URL.createObjectURL(swBlob))
+                .catch(err => console.log('SW registration fallback active.'));
+            }
+        };
+        setupPWA();
+
+        // PWA Install Prompt Logic
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('installAppBtn').style.display = 'flex';
+        });
+
+        async function installPWA() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    document.getElementById('installAppBtn').style.display = 'none';
+                }
+                deferredPrompt = null;
+            }
+        }
+
+
+        // --- App State ---
+        let allMedia = [], filteredMedia = [], currentPage = 1, pageSize = 20;
+        let activeMedia = null, activeIndex = -1;
+        
+        let colorIdx = 0, isEnhanced = false;
+        let markA = null, markB = null;
+        let playbackSpeed = 1;
+        
+        const fileData = {}; 
+        
+        // Cache Optimization: Store video thumbnails to prevent lagging UI
+        const thumbnailCache = {}; 
+        
+        // Filtering & Sorting State
+        let currentTypeFilter = 'all';
+        let selectedTags = new Set();
+        let animationFrameId = null;
+
+        const colorFilters = [
+            { name: '🎨 Color Filter', filter: 'none' },
+            { name: '🎨 CTO (Orange)', filter: 'sepia(0.6) hue-rotate(-15deg) saturate(1.5)' },
+            { name: '🎨 CTB (Blue)', filter: 'sepia(0.4) hue-rotate(180deg) saturate(1.2) brightness(0.9)' },
+            { name: '🎨 Plusgreen', filter: 'sepia(0.3) hue-rotate(75deg) saturate(1.2)' },
+            { name: '🎨 Minusgreen', filter: 'sepia(0.3) hue-rotate(285deg) saturate(1.2)' },
+            { name: '🎨 CC Filters', filter: 'contrast(1.2) saturate(1.3) brightness(1.1)' }
+        ];
+
+        function showNotification(msg) {
+            const toast = document.getElementById('toastMsg');
+            toast.innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => { toast.classList.remove('show'); }, 3000);
+        }
+        
+        function goHome() {
+            closeViewer();
+            document.getElementById('searchInput').value = '';
+            document.getElementById('sortSelect').value = 'name';
+            currentTypeFilter = 'all';
+            selectedTags.clear();
+            updateCategoriesUI();
+            applyFilters();
+            
+            const mainContent = document.getElementById('mainContent');
+            if(mainContent) mainContent.scrollTop = 0;
+            
+            showNotification("Returned to Home");
+        }
+
+        function exportData() {
+            if (Object.keys(fileData).length === 0) {
+                showNotification("No data to export!");
+                return;
+            }
+            const dataStr = JSON.stringify(fileData, null, 2);
+            const blob = new Blob([dataStr], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "gallery_backup.json";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showNotification("Backup Exported Successfully");
+            document.getElementById('settingsDropdown').style.display = 'none';
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    Object.assign(fileData, importedData);
+                    updateCategoriesUI();
+                    applyFilters();
+                    renderMarksList();
+                    showNotification("Data Imported Successfully!");
+                } catch (err) {
+                    showNotification("Error: Invalid backup file.");
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; 
+            document.getElementById('settingsDropdown').style.display = 'none';
+        }
+
+        document.getElementById('folderPicker').addEventListener('change', (e) => {
+            allMedia = Array.from(e.target.files).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/')).map(file => {
+                const media = {
+                    file, url: URL.createObjectURL(file), type: file.type.startsWith('image/') ? 'image' : 'video',
+                    size: file.size, date: file.lastModified, duration: 0, resolution: 0
+                };
+                extractMetadata(media);
+                return media;
+            });
+            updateCategoriesUI();
+            applyFilters();
+            renderMarksList();
+        });
+
+        // Optimized Cache Extraction - generates lightweight thumbnails for videos
+        function extractMetadata(media) {
+            if (media.type === 'image') {
+                const img = new Image();
+                img.onload = () => { media.resolution = img.width * img.height; };
+                img.src = media.url;
+            } else {
+                const vid = document.createElement('video');
+                vid.onloadedmetadata = () => {
+                    media.duration = vid.duration || 0;
+                    media.resolution = vid.videoWidth * vid.videoHeight;
+                    
+                    // Trigger thumbnail generation
+                    if (!thumbnailCache[media.url]) {
+                        vid.currentTime = Math.min(2, media.duration / 2); // get frame at 2s or middle
+                    }
+                };
+                vid.onseeked = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 160;
+                        canvas.height = 90;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
+                        thumbnailCache[media.url] = canvas.toDataURL('image/jpeg', 0.6);
+                        
+                        // Check if this media is on the current page, if so re-render softly
+                        const mIndex = filteredMedia.indexOf(media);
+                        const start = (currentPage - 1) * pageSize;
+                        if (mIndex >= start && mIndex < start + pageSize) {
+                            renderGallery(); 
+                        }
+                    } catch(e) {}
+                };
+                vid.preload = 'auto';
+                vid.src = media.url;
+            }
+        }
+
+        function toggleDropdown(event, id) {
+            event.stopPropagation();
+            const el = document.getElementById(id);
+            const isVisible = el.style.display === 'block';
+            
+            const dropdowns = document.getElementsByClassName("dropdown-content");
+            for (let i = 0; i < dropdowns.length; i++) dropdowns[i].style.display = 'none';
+            
+            if (!isVisible) el.style.display = 'block';
+        }
+
+        window.onclick = function(event) {
+            if (!event.target.matches('.dropbtn') && !event.target.closest('.dropdown-content')) {
+                const dropdowns = document.getElementsByClassName("dropdown-content");
+                for (let i = 0; i < dropdowns.length; i++) dropdowns[i].style.display = 'none';
+            }
+        }
+
+        function filterType(t) { currentTypeFilter = t; applyFilters(); }
+
+        function toggleTag(cb) {
+            if(cb.checked) selectedTags.add(cb.value);
+            else selectedTags.delete(cb.value);
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const query = document.getElementById('searchInput').value.toLowerCase().trim();
+            const keywords = query ? query.split(/\s+/) : [];
+            const sortMethod = document.getElementById('sortSelect').value;
+
+            filteredMedia = allMedia.filter(m => {
+                if (currentTypeFilter !== 'all' && m.type !== currentTypeFilter) return false;
+
+                const id = getFileId(m);
+                const fData = fileData[id] || { tags: '', description: '' };
+                const mTags = fData.tags.toLowerCase();
+                const mDesc = fData.description.toLowerCase();
+                const mName = m.file.name.toLowerCase();
+
+                if (selectedTags.size > 0) {
+                    const fileTagArray = mTags.split(',').map(t => t.trim()).filter(t => t);
+                    let hasAnySelectedTag = false;
+                    for (let t of fileTagArray) {
+                        if (selectedTags.has(t)) { hasAnySelectedTag = true; break; }
+                    }
+                    if (!hasAnySelectedTag) return false;
+                }
+
+                if (keywords.length > 0) {
+                    let hasKeyword = false;
+                    for (let kw of keywords) {
+                        if (mName.includes(kw) || mTags.includes(kw) || mDesc.includes(kw)) {
+                            hasKeyword = true; break;
+                        }
+                    }
+                    if (!hasKeyword) return false;
+                }
+
+                return true;
+            });
+
+            filteredMedia.sort((a, b) => {
+                if (sortMethod === 'name') return a.file.name.localeCompare(b.file.name);
+                if (sortMethod === 'size') return b.size - a.size;
+                if (sortMethod === 'date') return b.date - a.date;
+                if (sortMethod === 'duration') return b.duration - a.duration;
+                if (sortMethod === 'resolution') return b.resolution - a.resolution;
+                return 0;
+            });
+
+            currentPage = 1;
+            renderGallery();
+        }
+
+        function updateCategoriesUI() {
+            const tags = new Set();
+            for (let key in fileData) {
+                if(fileData[key].tags) {
+                    fileData[key].tags.split(',').forEach(t => {
+                        const tr = t.trim();
+                        if(tr) tags.add(tr.toLowerCase());
+                    });
+                }
+            }
+            
+            const container = document.getElementById('categoriesDropdown');
+            container.innerHTML = '';
+            
+            if(tags.size === 0) {
+                container.innerHTML = '<div style="padding: 15px; color: #aaa; font-size:14px;">No tags found</div>';
+                return;
+            }
+
+            selectedTags.forEach(st => { if(!tags.has(st)) selectedTags.delete(st); });
+
+            tags.forEach(tag => {
+                const lbl = document.createElement('label');
+                const isChecked = selectedTags.has(tag) ? 'checked' : '';
+                lbl.innerHTML = `<input type="checkbox" value="${tag}" ${isChecked} onchange="toggleTag(this)"> ${tag}`;
+                container.appendChild(lbl);
+            });
+        }
+
+        function renderGallery() {
+            const start = (currentPage - 1) * pageSize;
+            const pageData = filteredMedia.slice(start, start + pageSize);
+            const gallery = document.getElementById('gallery');
+            gallery.innerHTML = '';
+            
+            pageData.forEach((m, idx) => {
+                const div = document.createElement('div');
+                div.className = 'thumb';
+                const typeLabel = m.type === 'video' ? '🎥' : '🖼️';
+                const mediaNumber = start + idx + 1; 
+                
+                // Optimized Cache: Use lazy loading and cached image frames for videos
+                let mediaElementHTML = '';
+                if (m.type === 'image') {
+                    mediaElementHTML = `<img src="${m.url}" loading="lazy" alt="Image thumbnail">`;
+                } else {
+                    if (thumbnailCache[m.url]) {
+                        mediaElementHTML = `<img src="${thumbnailCache[m.url]}" loading="lazy" alt="Video thumbnail">`;
+                    } else {
+                        // Fallback minimal element if thumbnail is still generating
+                        mediaElementHTML = `<div style="width:100%; height:160px; background:#111; display:flex; align-items:center; justify-content:center; border-radius:6px; color:#555;">Loading...</div>`;
+                    }
+                }
+
+                div.innerHTML = mediaElementHTML;
+                div.innerHTML += `<div class="thumb-type">${typeLabel}</div>`;
+                div.innerHTML += `<div class="thumb-number">${mediaNumber}</div>`; 
+                div.onclick = () => openViewer(m, start + idx);
+                gallery.appendChild(div);
+            });
+            renderPagination();
+        }
+
+        function renderPagination() {
+            const pagination = document.getElementById('pagination');
+            const total = Math.ceil(filteredMedia.length / pageSize);
+            pagination.innerHTML = '';
+            if(total <= 1) return; 
+            for(let i=1; i<=total; i++) {
+                const b = document.createElement('button');
+                b.className = `page-btn ${currentPage === i ? 'active' : ''}`; 
+                b.textContent = i;
+                b.onclick = () => { currentPage = i; renderGallery(); };
+                pagination.appendChild(b);
+            }
+        }
+
+        function getFileId(media) { return media.file.name; }
+
+        function ensureFileData(fileId) {
+            if(!fileData[fileId]) fileData[fileId] = { marks: [], tags: "", description: "" };
+        }
+
+        function openViewer(m, index = -1) {
+            if (index === -1) index = filteredMedia.findIndex(fm => fm === m);
+            activeMedia = m;
+            activeIndex = index;
+            
+            playbackSpeed = 1;
+            colorIdx = 0;
+            isEnhanced = false;
+            markA = null; markB = null;
+            closeKeyMoments(); 
+            
+            const fileId = getFileId(m);
+            ensureFileData(fileId);
+            
+            document.getElementById('metaTags').value = fileData[fileId].tags;
+            document.getElementById('metaDesc').value = fileData[fileId].description;
+
+            // Translucent media counter
+            const counterStr = `${activeIndex + 1} / ${filteredMedia.length}`;
+            document.getElementById('mediaCounter').textContent = counterStr;
+
+            updateTagSuggestions();
+
+            const mContainer = document.getElementById('mediaContainer');
+            
+            mContainer.innerHTML = `
+                ${m.type === 'image' 
+                    ? `<img src="${m.url}" id="viewEl" style="transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);">` 
+                    : `<video src="${m.url}" id="viewEl" playsinline preload="auto" style="will-change: transform, filter; transform: translateZ(0); backface-visibility: hidden; transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);"></video>`}
+                <div id="interactionLayer">
+                    <svg id="gestureLayer" width="100%" height="100%" style="position:absolute; top:0; left:0; pointer-events:none; z-index:100;">
+                        <polyline id="gestureLine" fill="none" stroke="#1db954" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0px 0px 4px rgba(0,0,0,0.8));" />
+                    </svg>
+                </div>
+            `;
+            
+            document.getElementById('timelineContainer').style.display = m.type === 'video' ? 'block' : 'none';
+            document.getElementById('viewerModal').style.display = 'flex';
+            
+            setupMediaInteractions();
+            renderControls();
+            applyVisualFilters();
+
+            if (m.type === 'video') {
+                const vid = document.getElementById('viewEl');
+                vid.pause(); 
+                
+                vid.addEventListener('play', () => {
+                    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                    updateTimelineLoop();
+                });
+                
+                vid.addEventListener('pause', () => {
+                    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                    updateTimeline(); 
+                });
+                
+                vid.addEventListener('timeupdate', () => {
+                    if (vid.paused) updateTimeline(); 
+                });
+
+                vid.addEventListener('loadedmetadata', drawTimelineMarks);
+                drawTimelineMarks();
+            }
+        }
+
+        function navigateMedia(dir) {
+            if(activeIndex === -1 || filteredMedia.length === 0) return;
+            let newIndex = activeIndex + dir;
+            if(newIndex < 0) newIndex = filteredMedia.length - 1; 
+            if(newIndex >= filteredMedia.length) newIndex = 0;    
+            
+            const vid = document.getElementById('viewEl');
+            if (vid && vid.tagName === 'VIDEO') { 
+                vid.pause(); 
+                if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            }
+            openViewer(filteredMedia[newIndex], newIndex);
+        }
+
+        // --- Gesture & Media Interactions ---
+        let holdInterval = null;
+        let isHolding = false;
+        let pointerIsDown = false;
+        let gesturePts = [];
+        let isDrawingGesture = false;
+
+        function recognizeGesture(pts) {
+            if (pts.length < 10) return null;
+
+            let minX = Math.min(...pts.map(p=>p.x)), maxX = Math.max(...pts.map(p=>p.x));
+            let minY = Math.min(...pts.map(p=>p.y)), maxY = Math.max(...pts.map(p=>p.y));
+            let w = maxX - minX, h = maxY - minY;
+            let diag = Math.sqrt(w*w + h*h);
+
+            if (diag < 40) return null; 
+
+            let startEndDist = Math.hypot(pts[0].x - pts[pts.length-1].x, pts[0].y - pts[pts.length-1].y);
+            let isClosed = startEndDist < diag * 0.45; 
+            let isSquareIsh = Math.min(w, h) / Math.max(w, h) > 0.4;
+
+            if (isClosed && isSquareIsh) {
+                let area = 0;
+                for(let i=0; i<pts.length-1; i++) area += (pts[i].x * pts[i+1].y) - (pts[i+1].x * pts[i].y);
+                area += (pts[pts.length-1].x * pts[0].y) - (pts[0].x * pts[pts.length-1].y);
+                return area > 0 ? 'O_CW' : 'O_CCW';
+            }
+
+            let yTurns = 0, lastYDir = 0, currentY = pts[0].y;
+            let threshold = h * 0.15; 
+            
+            for (let i=1; i<pts.length; i++) {
+                let dy = pts[i].y - currentY;
+                if (Math.abs(dy) > threshold) {
+                    let dir = Math.sign(dy);
+                    if (lastYDir !== 0 && dir !== lastYDir) yTurns++;
+                    lastYDir = dir;
+                    currentY = pts[i].y;
+                }
+            }
+
+            let overallXDir = pts[pts.length-1].x - pts[0].x;
+            if (yTurns === 2 && overallXDir > w * 0.25 && !isClosed) {
+                return 'N';
+            }
+
+            return null;
+        }
+
+        function executeGesture(gesture, pts, layer) {
+            const el = document.getElementById('viewEl');
+            if (!el) return;
+
+            if (gesture === 'O_CCW') {
+                let minX = Math.min(...pts.map(p=>p.x)), maxX = Math.max(...pts.map(p=>p.x));
+                let minY = Math.min(...pts.map(p=>p.y)), maxY = Math.max(...pts.map(p=>p.y));
+                let cX = minX + (maxX - minX) / 2;
+                let cY = minY + (maxY - minY) / 2;
+                
+                let boxDiag = Math.sqrt(Math.pow(maxX - minX, 2) + Math.pow(maxY - minY, 2));
+                let viewportDiag = Math.sqrt(layer.clientWidth**2 + layer.clientHeight**2);
+                
+                let zoomScale = Math.max(1.2, Math.min(10, viewportDiag / (boxDiag * 1.5))); 
+                
+                el.style.transformOrigin = `${cX}px ${cY}px`;
+                el.style.transform = `scale(${zoomScale})`;
+                showNotification("Zoomed in (Draw clockwise O to reset)");
+            } 
+            else if (gesture === 'O_CW') {
+                el.style.transform = 'scale(1)';
+                showNotification("Zoom reset");
+            }
+            else if (gesture === 'N') {
+                let area = document.getElementById('mediaArea');
+                if (!document.fullscreenElement) {
+                    if (area.requestFullscreen) area.requestFullscreen();
+                    else if (area.webkitRequestFullscreen) area.webkitRequestFullscreen();
+                    showNotification("Entered Fullscreen");
+                } else {
+                    if (document.exitFullscreen) document.exitFullscreen();
+                    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+                    showNotification("Exited Fullscreen");
+                }
+            }
+        }
+
+        function setupMediaInteractions() {
+            const layer = document.getElementById('interactionLayer');
+            const vid = document.getElementById('viewEl');
+            const line = document.getElementById('gestureLine');
+            if(!layer || !vid) return;
+
+            if (holdInterval) { clearInterval(holdInterval); holdInterval = null; }
+            isHolding = false;
+            pointerIsDown = false;
+            
+            if(activeMedia && activeMedia.type === 'video') vid.pause();
+
+            const handleDown = (e) => {
+                if(e.button !== 0 && e.pointerType === 'mouse') return;
+                e.preventDefault();
+                pointerIsDown = true;
+                
+                const rect = layer.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+                
+                gesturePts = [{x: clickX, y: clickY}];
+                isDrawingGesture = false;
+                line.setAttribute('points', `${clickX},${clickY}`);
+                
+                if (activeMedia && activeMedia.type === 'video') {
+                    isHolding = true;
+                    if (clickX > rect.width / 2) {
+                        vid.play();
+                    } else {
+                        vid.pause();
+                        holdInterval = setInterval(() => { 
+                            vid.currentTime = Math.max(0, vid.currentTime - (0.2 * playbackSpeed)); 
+                        }, 50); 
+                    }
+                }
+            };
+
+            const handleMove = (e) => {
+                if(!pointerIsDown) return;
+                e.preventDefault(); // Mistouch prevention - locks scrolling when interacting
+                
+                const rect = layer.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                gesturePts.push({x, y});
+                
+                let start = gesturePts[0];
+                let dist = Math.hypot(x - start.x, y - start.y);
+                
+                if (!isDrawingGesture && dist > 15) {
+                    isDrawingGesture = true;
+                    if (activeMedia && activeMedia.type === 'video') {
+                        isHolding = false;
+                        vid.pause();
+                        if (holdInterval) { clearInterval(holdInterval); holdInterval = null; }
+                    }
+                }
+                
+                if (isDrawingGesture) {
+                    let pointsStr = gesturePts.map(p => `${p.x},${p.y}`).join(' ');
+                    line.setAttribute('points', pointsStr);
+                }
+            };
+
+            const handleUp = (e) => {
+                if(!pointerIsDown) return;
+                pointerIsDown = false;
+                
+                if (isDrawingGesture) {
+                    line.setAttribute('points', ''); 
+                    let gesture = recognizeGesture(gesturePts);
+                    if (gesture) executeGesture(gesture, gesturePts, layer);
+                } else {
+                    if (activeMedia && activeMedia.type === 'video') {
+                        isHolding = false;
+                        vid.pause();
+                        if (holdInterval) { clearInterval(holdInterval); holdInterval = null; }
+                    }
+                }
+                isDrawingGesture = false;
+                gesturePts = [];
+            };
+
+            layer.addEventListener('pointerdown', handleDown);
+            layer.addEventListener('pointermove', handleMove, {passive: false});
+            layer.addEventListener('pointerup', handleUp);
+            layer.addEventListener('pointerleave', handleUp);
+            layer.addEventListener('pointercancel', handleUp); 
+            layer.addEventListener('contextmenu', e => e.preventDefault()); 
+        }
+
+        function updateTimelineLoop() {
+            updateTimeline();
+            const vid = document.getElementById('viewEl');
+            if (vid && !vid.paused) {
+                animationFrameId = requestAnimationFrame(updateTimelineLoop);
+            }
+        }
+
+        function updateTimeline() {
+            const vid = document.getElementById('viewEl');
+            const progress = document.getElementById('timelineProgress');
+            if(vid && vid.duration) {
+                const pct = (vid.currentTime / vid.duration) * 100;
+                progress.style.width = pct + '%';
+                checkABLoop(); 
+            }
+        }
+
+        function seekTimeline(e) {
+            const vid = document.getElementById('viewEl');
+            if(!vid || vid.tagName !== 'VIDEO' || !vid.duration) return;
+            const rect = document.getElementById('timelineContainer').getBoundingClientRect();
+            const pct = (e.clientX - rect.left) / rect.width;
+            vid.currentTime = pct * vid.duration;
+            markA = null; markB = null; 
+            updateTimeline();
+        }
+
+        function drawTimelineMarks() {
+            const vid = document.getElementById('viewEl');
+            const marksContainer = document.getElementById('timelineMarks');
+            if(!vid || !vid.duration || !marksContainer) return;
+            
+            marksContainer.innerHTML = '';
+            const fileId = getFileId(activeMedia);
+            const marks = fileData[fileId].marks;
+
+            marks.forEach(m => {
+                const el = document.createElement('div');
+                if(m.type === 'bookmark') {
+                    el.className = 'timeline-mark';
+                    el.style.left = ((m.time / vid.duration) * 100) + '%';
+                } else {
+                    el.className = 'timeline-loop';
+                    const startPct = (m.start / vid.duration) * 100;
+                    const widthPct = ((m.end - m.start) / vid.duration) * 100;
+                    el.style.left = startPct + '%';
+                    el.style.width = widthPct + '%';
+                }
+                marksContainer.appendChild(el);
+            });
+        }
+
+        // --- Metadata, Tag Suggestions & Controls ---
+        
+        function updateTagSuggestions() {
+            const container = document.getElementById('tagSuggestions');
+            if (!container) return;
+
+            const tagCounts = {};
+            for (let key in fileData) {
+                if(fileData[key].tags) {
+                    fileData[key].tags.split(',').forEach(t => {
+                        const tr = t.trim().toLowerCase();
+                        if(tr) tagCounts[tr] = (tagCounts[tr] || 0) + 1;
+                    });
+                }
+            }
+
+            const sortedTags = Object.keys(tagCounts).sort((a, b) => tagCounts[b] - tagCounts[a]).slice(0, 8);
+
+            if (sortedTags.length === 0) {
+                container.innerHTML = '<span style="color:#555; font-size:12px; font-style:italic;">No saved tags yet</span>';
+                return;
+            }
+
+            container.innerHTML = '';
+            sortedTags.forEach(tag => {
+                const chip = document.createElement('div');
+                chip.className = 'tag-chip';
+                chip.textContent = '+ ' + tag;
+                chip.onclick = () => addTagFromSuggestion(tag);
+                container.appendChild(chip);
+            });
+        }
+
+        function addTagFromSuggestion(tag) {
+            const input = document.getElementById('metaTags');
+            let currentTags = input.value.split(',').map(t => t.trim()).filter(t => t);
+            if (!currentTags.includes(tag)) {
+                currentTags.push(tag);
+                input.value = currentTags.join(', ');
+                saveMetadata();
+                showNotification(`Added tag: ${tag}`);
+            }
+        }
+
+        function saveMetadata() {
+            if(!activeMedia) return;
+            const fileId = getFileId(activeMedia);
+            ensureFileData(fileId);
+            fileData[fileId].tags = document.getElementById('metaTags').value;
+            fileData[fileId].description = document.getElementById('metaDesc').value;
+            
+            updateCategoriesUI();
+            applyFilters();
+            updateTagSuggestions(); 
+        }
+
+        function renderControls() {
+            const controlsArea = document.getElementById('viewerControls');
+            controlsArea.innerHTML = '';
+
+            let currentFilterName = colorFilters[colorIdx].name;
+            let universalTools = `
+                <button class="btn" style="background:#f39c12" onclick="toggleEnhance()">✨ Enhance Clarity</button>
+                <button class="btn" id="colorFilterBtn" style="background:#607d8b" onclick="toggleColor()">${currentFilterName}</button>
+            `;
+
+            if(activeMedia.type === 'video') {
+                controlsArea.innerHTML += `
+                    <div class="slider-container">
+                        <label>Speed: <span id="speedDisplay">1.0x</span></label>
+                        <input type="range" id="speedSlider" min="0.25" max="3" step="0.25" value="1" oninput="updateSpeed(this.value)">
+                    </div>
+                    <button class="btn" style="background:#e91e63" onclick="generateKeyMoments()">🎞️ Key Moments</button>
+                    <button class="btn" style="background:#007bff" onclick="setBookmark()">📌 Bookmark</button>
+                    <button class="btn" style="background:#9c27b0" onclick="setAB('A')">Set Loop (A)</button>
+                    <button class="btn" style="background:#9c27b0" onclick="setAB('B')">Set Loop (B)</button>
+                `;
+            }
+
+            controlsArea.innerHTML += universalTools;
+        }
+
+        function updateSpeed(val) {
+            playbackSpeed = parseFloat(val);
+            document.getElementById('speedDisplay').innerText = playbackSpeed.toFixed(1) + 'x';
+            const vid = document.getElementById('viewEl');
+            if (vid) vid.playbackRate = playbackSpeed;
+        }
+
+        function toggleEnhance() {
+            isEnhanced = !isEnhanced;
+            applyVisualFilters();
+            showNotification(isEnhanced ? "Enhance: Vivid & Clear ON" : "Enhance: OFF");
+        }
+
+        function toggleColor() {
+            colorIdx = (colorIdx + 1) % colorFilters.length;
+            document.getElementById('colorFilterBtn').innerHTML = colorFilters[colorIdx].name;
+            applyVisualFilters();
+        }
+
+        function applyVisualFilters() {
+            const el = document.getElementById('viewEl');
+            if(!el) return;
+            
+            let baseFilter = colorFilters[colorIdx].filter;
+            if(baseFilter === 'none') baseFilter = '';
+            
+            if(isEnhanced) {
+                baseFilter += " contrast(1.25) saturate(1.4) brightness(1.05)";
+            }
+            
+            el.style.filter = baseFilter.trim() || 'none';
+        }
+
+        // --- Key Moments Section Handlers ---
+        let cancelKeyMomentsGeneration = false;
+        
+        function closeKeyMoments() {
+            cancelKeyMomentsGeneration = true;
+            document.getElementById('keyMomentsPanel').style.display = 'none';
+        }
+
+        async function generateKeyMoments() {
+            cancelKeyMomentsGeneration = false;
+            const panel = document.getElementById('keyMomentsPanel');
+            const thumbContainer = document.getElementById('kmThumbContainer');
+            const mainVid = document.getElementById('viewEl');
+            
+            panel.style.display = 'block';
+            
+            thumbContainer.innerHTML = `
+                <div style="display:flex; align-items:center; height:100px; color:#1db954; font-weight:bold; padding-left: 20px;">
+                    Generating Key Moments...
+                </div>
+            `;
+
+            if(!mainVid || !mainVid.duration) {
+                thumbContainer.innerHTML = `<div style="padding:20px; color:red;">Error: Video not fully loaded.</div>`;
+                return;
+            }
+
+            const hiddenVid = document.createElement('video');
+            hiddenVid.src = activeMedia.url;
+            hiddenVid.muted = true;
+            hiddenVid.preload = 'auto'; 
+            hiddenVid.setAttribute('playsinline', ''); 
+            
+            hiddenVid.style.position = 'absolute';
+            hiddenVid.style.left = '-9999px';
+            hiddenVid.style.top = '-9999px';
+            
+            document.body.appendChild(hiddenVid); 
+            
+            try {
+                await new Promise((resolve, reject) => { 
+                    hiddenVid.onloadeddata = resolve; 
+                    hiddenVid.onerror = reject;
+                });
+
+                if (!hiddenVid.videoWidth) {
+                    await new Promise(r => hiddenVid.onloadedmetadata = r);
+                }
+                
+                const duration = hiddenVid.duration;
+                const interval = duration / 16; 
+                
+                thumbContainer.innerHTML = ''; 
+                
+                const aspect = hiddenVid.videoWidth / hiddenVid.videoHeight;
+                const canvasWidth = aspect ? (100 * aspect) : 177;
+
+                for(let i=1; i<=15; i++) {
+                    if(cancelKeyMomentsGeneration) break;
+
+                    const targetTime = interval * i;
+                    hiddenVid.currentTime = targetTime;
+                    
+                    await new Promise(r => { hiddenVid.onseeked = r; });
+                    await new Promise(r => setTimeout(r, 150)); 
+                    
+                    if(cancelKeyMomentsGeneration) break;
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = canvasWidth;
+                    canvas.height = 100;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(hiddenVid, 0, 0, canvas.width, canvas.height);
+                    
+                    const thumbDiv = document.createElement('div');
+                    thumbDiv.className = 'km-thumb';
+                    thumbDiv.style.width = canvas.width + 'px';
+                    thumbDiv.appendChild(canvas);
+                    thumbDiv.innerHTML += `<div class="km-time-label">${formatTime(targetTime)}</div>`;
+                    
+                    thumbDiv.onclick = () => { mainVid.currentTime = targetTime; };
+                    
+                    thumbContainer.appendChild(thumbDiv);
+                }
+            } catch (err) {
+                thumbContainer.innerHTML = `<div style="padding:20px; color:red;">Failed to load thumbnails.</div>`;
+            } finally {
+                if(document.body.contains(hiddenVid)) {
+                    document.body.removeChild(hiddenVid);
+                }
+            }
+        }
+
+        // --- Bookmarks & Loops ---
+        function formatTime(secs) {
+            const m = Math.floor(secs / 60);
+            const s = Math.floor(secs % 60);
+            return `${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        function setBookmark() { 
+            const vid = document.getElementById('viewEl');
+            if(!vid || vid.tagName !== 'VIDEO') return;
+            const t = vid.currentTime;
+            saveMark({ id: Date.now(), type: 'bookmark', time: t, label: `Bookmarked at ${formatTime(t)}` });
+            showNotification("Bookmark saved!");
+        }
+
+        function setAB(type) {
+            const vid = document.getElementById('viewEl');
+            if(!vid || vid.tagName !== 'VIDEO') return;
+            
+            if(type === 'A') {
+                markA = vid.currentTime;
+                showNotification("Loop Point A set");
+            } else {
+                markB = vid.currentTime;
+                if(markA !== null && markB !== null) {
+                    saveMark({ id: Date.now(), type: 'loop', start: markA, end: markB, label: `Loop: ${formatTime(markA)} to ${formatTime(markB)}` });
+                    showNotification("A-B Loop saved!");
+                }
+            }
+        }
+
+        function checkABLoop() {
+            const vid = document.getElementById('viewEl');
+            if(markA !== null && markB !== null && vid) {
+                if(vid.currentTime > markB || vid.currentTime < markA) {
+                    vid.currentTime = markA;
+                }
+            }
+        }
+
+        function saveMark(mark) {
+            const id = getFileId(activeMedia);
+            ensureFileData(id);
+            fileData[id].marks.push(mark);
+            renderMarksList(); 
+            drawTimelineMarks(); 
+        }
+
+        function renderMarksList() {
+            const listEl = document.getElementById('marksList');
+            if(!listEl) return;
+            listEl.innerHTML = '';
+            
+            let hasMarks = false;
+            for (const fileId in fileData) {
+                const marks = fileData[fileId].marks;
+                if (marks && marks.length > 0) {
+                    hasMarks = true;
+                    const fileGroup = document.createElement('div');
+                    fileGroup.innerHTML = `<div class="file-group-title">📄 ${fileId}</div>`;
+                    
+                    marks.forEach(m => {
+                        const li = document.createElement('li');
+                        li.className = 'mark-item';
+                        li.onclick = () => playMark(fileId, m);
+                        
+                        const typeLabel = m.type === 'bookmark' ? 'Bookmark' : 'A-B Loop';
+                        li.innerHTML = `
+                            <div class="mark-info">
+                                <span class="mark-type">${typeLabel}</span>
+                                <span class="mark-label">${m.label}</span>
+                            </div>
+                            <button class="mark-delete" title="Delete Mark" onclick="deleteMark('${fileId}', ${m.id}); event.stopPropagation();">✖</button>
+                        `;
+                        fileGroup.appendChild(li);
+                    });
+                    listEl.appendChild(fileGroup);
+                }
+            }
+            if (!hasMarks) listEl.innerHTML = '<div class="empty-marks">No marks or loops saved yet. Select a video and save a bookmark to see it here!</div>';
+        }
+
+        function playMark(fileId, mark) {
+            const targetMedia = allMedia.find(m => getFileId(m) === fileId);
+            if (!targetMedia) {
+                showNotification("File not loaded! Select the correct folder first.");
+                return;
+            }
+            openViewer(targetMedia);
+            
+            const vid = document.getElementById('viewEl');
+            if (vid) {
+                const applyMark = () => {
+                    if (mark.type === 'bookmark') {
+                        vid.currentTime = mark.time; markA = null; markB = null;
+                    } else if (mark.type === 'loop') {
+                        markA = mark.start; markB = mark.end; vid.currentTime = mark.start;
+                    }
+                };
+                if (vid.readyState >= 1) applyMark();
+                else vid.addEventListener('loadedmetadata', applyMark, {once:true});
+            }
+        }
+
+        function deleteMark(fileId, markId) {
+             // Mistouch Optimization - Added Confirmation Alert
+             if (confirm("Are you sure you want to delete this saved mark/loop?")) {
+                 if(fileData[fileId]) {
+                     fileData[fileId].marks = fileData[fileId].marks.filter(m => m.id !== markId);
+                     renderMarksList();
+                     if(activeMedia && getFileId(activeMedia) === fileId) drawTimelineMarks();
+                     showNotification("Mark deleted");
+                 }
+             }
+        }
+
+        function closeViewer() { 
+            document.getElementById('viewerModal').style.display = 'none'; 
+            markA = null; markB = null; 
+            closeKeyMoments(); 
+            const vid = document.getElementById('viewEl');
+            if (vid && vid.tagName === 'VIDEO') { 
+                vid.pause(); 
+                if (animationFrameId) cancelAnimationFrame(animationFrameId); 
+            }
+            activeMedia = null;
+            activeIndex = -1;
+            document.getElementById('mediaContainer').innerHTML = '';
+            if (document.fullscreenElement) {
+                if (document.exitFullscreen) document.exitFullscreen();
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            }
+        }
+    </script>
+</body>
+</html>
+
